@@ -26,4 +26,3 @@ You can install the MySQL connector using pip:
 
 ```bash
 pip install mysql-connector-python
-```
