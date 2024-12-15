@@ -2,13 +2,12 @@
 import unittest
 from unittest.mock import patch
 from parameterized import parameterized_class
-import requests
 from client import GithubOrgClient  # Adjust the import based on your project structure
-from fixtures import org_payload, repos_payload, expected_repos, apache2_repos  # Adjust as necessary
+from fixtures import org_payload, repos_payload, expected_repos  # Adjust as necessary
 
 @parameterized_class(("org_payload", "repos_payload", "expected_repos"), [
     (org_payload, repos_payload, expected_repos),
-    # Add more tuples for other fixtures if needed
+    # You can add more fixtures here if needed
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
     """Integration tests for the GithubOrgClient class."""
@@ -20,7 +19,7 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         cls.mock_get = cls.get_patcher.start()
 
         # Define the side effects for different URLs
-        cls.mock_get.side_effect = lambda url: cls._mock_requests_get(url)
+        cls.mock_get.side_effect = cls._mock_requests_get
 
     @classmethod
     def tearDownClass(cls):
@@ -30,9 +29,9 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
     @classmethod
     def _mock_requests_get(cls, url):
         """Return mock responses based on the URL requested."""
-        if url == f"https://api.github.com/orgs/{self.org_payload['login']}":
+        if url == f"https://api.github.com/orgs/{cls.org_payload['login']}":
             return MockResponse(cls.org_payload)
-        elif url == f"https://api.github.com/orgs/{self.org_payload['login']}/repos":
+        elif url == f"https://api.github.com/orgs/{cls.org_payload['login']}/repos":
             return MockResponse(cls.repos_payload)
         return MockResponse({})  # Return an empty response for unexpected URLs
 
