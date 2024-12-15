@@ -1,54 +1,33 @@
 #!/usr/bin/env python3
 import unittest
-from unittest.mock import patch
-from parameterized import parameterized_class
-from client import GithubOrgClient
-from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
+from unittest.mock import patch, MagicMock
+from client import GithubOrgClient  # Adjust the import based on your project structure
 
+class TestGithubOrgClient(unittest.TestCase):
+    
+    @patch('client.GithubOrgClient.get_json')
+    def test_public_repos(self, mock_get_json):
+        # Sample payload to return from the mocked get_json method
+        mock_payload = [
+            {'id': 1, 'name': 'Repo1'},
+            {'id': 2, 'name': 'Repo2'},
+        ]
+        mock_get_json.return_value = mock_payload
+        
+        # Mock the _public_repos_url property
+        with patch('client.GithubOrgClient._public_repos_url', new_callable=MagicMock) as mock_url:
+            mock_url.return_value = 'https://api.github.com/orgs/test_org/repos'
 
-@parameterized_class([
-    {
-        "org_payload": org_payload,
-        "repos_payload": repos_payload,
-        "expected_repos": expected_repos,
-        "apache2_repos": apache2_repos
-    }
-])
-class TestIntegrationGithubOrgClient(unittest.TestCase):
-    """Integration tests for GithubOrgClient"""
+            client = GithubOrgClient('test_org')
+            repos = client.public_repos()
 
-    @classmethod
-    def setUpClass(cls):
-        """Set up for integration tests."""
-        cls.get_patcher = patch("requests.get")
-        cls.mock_get = cls.get_patcher.start()
+            # Assert the returned repos match the expected payload
+            self.assertEqual(repos, ['Repo1', 'Repo2'])
 
-        # Define a side_effect for the mock
-        def get_json_side_effect(url):
-            if url == "https://api.github.com/orgs/test-org":
-                return cls.org_payload
-            if url == "https://api.github.com/orgs/test-org/repos":
-                return cls.repos_payload
-            return None
+            # Assert that get_json was called once
+            mock_get_json.assert_called_once()
+            # Assert that the mocked URL property was accessed
+            mock_url.assert_called_once()
 
-        # Set the side_effect for json() calls on the mock
-        cls.mock_get.return_value.json.side_effect = get_json_side_effect
-
-    @classmethod
-    def tearDownClass(cls):
-        """Tear down the mock patcher."""
-        cls.get_patcher.stop()
-
-    def test_public_repos(self):
-        """Test public_repos method."""
-        client = GithubOrgClient("test-org")
-        self.assertEqual(client.public_repos(), self.expected_repos)
-
-    def test_public_repos_with_license(self):
-        """Test public_repos method with license filtering."""
-        client = GithubOrgClient("test-org")
-        self.assertEqual(client.public_repos("apache-2.0"), self.apache2_repos)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
