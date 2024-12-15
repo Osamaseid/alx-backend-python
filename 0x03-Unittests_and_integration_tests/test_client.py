@@ -3,7 +3,6 @@ import unittest
 from unittest.mock import patch, MagicMock
 from client import GithubOrgClient  # Adjust the import based on your project structure
 
-
 class TestGithubOrgClient(unittest.TestCase):
     """Test cases for the GithubOrgClient class."""
 
@@ -29,6 +28,9 @@ class TestGithubOrgClient(unittest.TestCase):
             client = GithubOrgClient('test_org')
             repos = client.public_repos()
 
+            # Debugging output
+            print(f"Expected: ['Repo1', 'Repo2'], Got: {repos}")
+
             # Assert the returned repos match the expected payload
             self.assertEqual(repos, ['Repo1', 'Repo2'])
 
@@ -36,7 +38,6 @@ class TestGithubOrgClient(unittest.TestCase):
             mock_get_json.assert_called_once()
             # Assert that the mocked URL property was accessed
             mock_url.assert_called_once()
-
 
 if __name__ == '__main__':
     unittest.main()
