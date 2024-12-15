@@ -1,43 +1,57 @@
 #!/usr/bin/env python3
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from parameterized import parameterized_class
+import requests
 from client import GithubOrgClient  # Adjust the import based on your project structure
+from fixtures import org_payload, repos_payload, expected_repos, apache2_repos  # Adjust as necessary
 
-class TestGithubOrgClient(unittest.TestCase):
-    """Test cases for the GithubOrgClient class."""
+@parameterized_class(("org_payload", "repos_payload", "expected_repos"), [
+    (org_payload, repos_payload, expected_repos),
+    # Add more tuples for other fixtures if needed
+])
+class TestIntegrationGithubOrgClient(unittest.TestCase):
+    """Integration tests for the GithubOrgClient class."""
 
-    @patch('client.GithubOrgClient.get_json')
-    def test_public_repos(self, mock_get_json):
-        """Test the public_repos method of GithubOrgClient.
+    @classmethod
+    def setUpClass(cls):
+        """Set up the patcher for requests.get."""
+        cls.get_patcher = patch('requests.get')
+        cls.mock_get = cls.get_patcher.start()
 
-        Mocks the get_json method and the _public_repos_url attribute
-        to verify that the public_repos method returns the expected
-        list of repository names and that the mocks are called correctly.
-        """
-        # Sample payload to return from the mocked get_json method
-        mock_payload = [
-            {'id': 1, 'name': 'Repo1'},
-            {'id': 2, 'name': 'Repo2'},
-        ]
-        mock_get_json.return_value = mock_payload
+        # Define the side effects for different URLs
+        cls.mock_get.side_effect = lambda url: cls._mock_requests_get(url)
 
-        # Mock the _public_repos_url property
-        with patch('client.GithubOrgClient._public_repos_url', new_callable=MagicMock) as mock_url:
-            mock_url.return_value = 'https://api.github.com/orgs/test_org/repos'
+    @classmethod
+    def tearDownClass(cls):
+        """Stop the patcher."""
+        cls.get_patcher.stop()
 
-            client = GithubOrgClient('test_org')
-            repos = client.public_repos()
+    @classmethod
+    def _mock_requests_get(cls, url):
+        """Return mock responses based on the URL requested."""
+        if url == f"https://api.github.com/orgs/{self.org_payload['login']}":
+            return MockResponse(cls.org_payload)
+        elif url == f"https://api.github.com/orgs/{self.org_payload['login']}/repos":
+            return MockResponse(cls.repos_payload)
+        return MockResponse({})  # Return an empty response for unexpected URLs
 
-            # Debugging output
-            print(f"Expected: ['Repo1', 'Repo2'], Got: {repos}")
+    def test_public_repos(self):
+        """Test the public_repos method of GithubOrgClient."""
+        client = GithubOrgClient(self.org_payload['login'])
+        repos = client.public_repos()
 
-            # Assert the returned repos match the expected payload
-            self.assertEqual(repos, ['Repo1', 'Repo2'])
+        # Assert the returned repos match the expected payload
+        self.assertEqual(repos, self.expected_repos)
 
-            # Assert that get_json was called once
-            mock_get_json.assert_called_once()
-            # Assert that the mocked URL property was accessed
-            mock_url.assert_called_once()
+class MockResponse:
+    """Mock response class for requests.get."""
+    def __init__(self, json_data):
+        self.json_data = json_data
+
+    def json(self):
+        """Return the mock JSON data."""
+        return self.json_data
 
 if __name__ == '__main__':
     unittest.main()
