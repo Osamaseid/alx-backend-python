@@ -136,10 +136,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'USER_ID_FIELD': 'user_id',  # Specify your custom primary key field
+    'USER_ID_CLAIM': 'user_id',  # Include user_id in the JWT payload
 }
 
 AUTH_USER_MODEL = 'chats.User'

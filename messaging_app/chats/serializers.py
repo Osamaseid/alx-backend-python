@@ -33,7 +33,7 @@ class MessageSerializer(serializers.ModelSerializer):
 # Conversation Serializer
 class ConversationSerializer(serializers.ModelSerializer):
     participants = serializers.SerializerMethodField()  # Custom method to handle nested relationships
-    messages = MessageSerializer(many=True, read_only=True, source='messages')  # Nested messages
+    messages = MessageSerializer(many=True, read_only=True,)  # Nested messages
 
     class Meta:
         model = Conversation

@@ -22,4 +22,5 @@ Messages:
 ** pip freeze > requirements.txt **
 
 pip install djangorestframework
+pip show drf-nested-routers
 pip install djangorestframework-simplejwt

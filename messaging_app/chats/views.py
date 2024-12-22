@@ -1,24 +1,27 @@
-from django.shortcuts import render
-
-# Create your views here.
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .permissions import IsOwnerOfConversation, IsSenderOfMessage
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from rest_framework.views import APIView
 from .models import Conversation, Message, User
 from .serializers import ConversationSerializer, MessageSerializer, SignupSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .auth import CustomTokenObtainPairSerializer
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for listing, creating, and retrieving conversations.
     """
+    permission_classes = [IsAuthenticated, IsOwnerOfConversation]
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-    filter_backends = [filters.SearchFilter]  # Add filters
-    search_fields = ['participants__first_name', 'participants__last_name']  # Filter by participant names
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['participants__first_name', 'participants__last_name']
+
+    def get_queryset(self):
+        # Return only conversations the user participates in
+        return Conversation.objects.filter(participants=self.request.user)
 
     def create(self, request, *args, **kwargs):
         """
@@ -31,7 +34,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        participants = User.objects.filter(id__in=participants_ids)
+        participants = User.objects.filter(user_id__in=participants_ids)
         if not participants.exists():
             return Response(
                 {"error": "Invalid participant IDs provided."},
@@ -52,10 +55,15 @@ class MessageViewSet(viewsets.ModelViewSet):
     """
     ViewSet for listing and creating messages.
     """
+    permission_classes = [IsAuthenticated, IsSenderOfMessage]
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    filter_backends = [filters.SearchFilter]  # Add filters
-    search_fields = ['message_body', 'sender__first_name', 'sender__last_name']  # Filter by message content or sender
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['message_body', 'sender__first_name', 'sender__last_name']
+
+    def get_queryset(self):
+        # Return only messages in conversations the user participates in
+        return Message.objects.filter(conversation__participants=self.request.user)
 
     def create(self, request, *args, **kwargs):
         """
@@ -67,13 +75,14 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         if not conversation_id or not sender_id or not message_body:
             return Response(
-                {"error": "conversation, sender, and message_body are required."},
+                {"error": "conversation_id, sender, and message_body are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            conversation = Conversation.objects.get(id=conversation_id)
-            sender = User.objects.get(id=sender_id)
+            conversation = Conversation.objects.get(
+                conversation_id=conversation_id)
+            sender = User.objects.get(user_id=sender_id)
         except (Conversation.DoesNotExist, User.DoesNotExist) as e:
             return Response(
                 {"error": str(e)},
@@ -96,7 +105,7 @@ class SignupView(APIView):
     """
     Endpoint for user registration.
     """
-    permission_classes = [AllowAny]  # Allow unauthenticated access
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = SignupSerializer(data=request.data)
@@ -106,16 +115,5 @@ class SignupView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsOwnerOfConversation]
-
-    def get_queryset(self):
-        # Return only conversations the user participates in
-        return Conversation.objects.filter(participants=self.request.user)
-
-class MessageViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsSenderOfMessage]
-
-    def get_queryset(self):
-        # Return only messages in conversations the user participates in
-        return Message.objects.filter(conversation__participants=self.request.user)
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
