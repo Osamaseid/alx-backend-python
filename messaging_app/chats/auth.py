@@ -22,3 +22,5 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Add the user's ID to the response
         data['user_id'] = str(self.user.user_id)  # Ensure user_id is returned
         return data
+
+
