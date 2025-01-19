@@ -1,22 +1,33 @@
-import mysql.connector
-import os
-from seed import connect_to_prodev
+#!/usr/bin/python3
+import seed
 
 def paginate_users(page_size, offset):
-    """Fetches a page of users from the database."""
-    connection = connect_to_prodev()
+    """
+    Fetch paginated users from the database
+    """
+    connection = seed.connect_to_prodev()
     cursor = connection.cursor(dictionary=True)
     cursor.execute(f"SELECT * FROM user_data LIMIT {page_size} OFFSET {offset}")
     rows = cursor.fetchall()
+    cursor.close()
     connection.close()
     return rows
 
-def lazy_paginate(page_size):
-    """Generator that lazily loads paginated data from the user_data table."""
+def lazy_pagination(page_size):
+    """
+    Generator function for lazy loading paginated users
+    """
     offset = 0
     while True:
-        page = paginate_users(page_size, offset)  # Fetch the next page
-        if not page:  # If there are no more rows, stop the generator
+        # Fetch a page of users
+        page = paginate_users(page_size, offset)
+        
+        # Stop if no more users
+        if not page:
             break
-        yield page  # Yield the current page
-        offset += page_size  # Move to the next offset
+        
+        # Yield the current page
+        yield page
+        
+        # Move to next page
+        offset += page_size

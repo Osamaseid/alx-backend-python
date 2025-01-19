@@ -1,2 +1,1 @@
- ﻿# alx-backend-python
-  week_3
+alx-backend-python

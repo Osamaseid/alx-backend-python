@@ -1,38 +1,60 @@
-import mysql.connector
-from mysql.connector import Error
+import sqlite3
 
 class DatabaseConnection:
-    def __init__(self, host, user, password, database):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+    """
+    Custom context manager for database connections
+    """
+    def __init__(self, db_name='users.db'):
+        """
+        Initialize the database connection
+        
+        Args:
+            db_name (str): Name of the SQLite database file
+        """
+        self.db_name = db_name
         self.connection = None
+        self.cursor = None
 
     def __enter__(self):
-        # Open the database connection
-        try:
-            self.connection = mysql.connector.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                database=self.database
-            )
-            if self.connection.is_connected():
-                return self.connection.cursor()  # Return a cursor for executing queries
-        except Error as e:
-            print(f"Error: {e}")
-            raise
+        """
+        Establish database connection when entering the context
+        
+        Returns:
+            sqlite3.Cursor: Database cursor for executing queries
+        """
+        # Open connection
+        self.connection = sqlite3.connect(self.db_name)
+        self.cursor = self.connection.cursor()
+        return self.cursor
 
     def __exit__(self, exc_type, exc_value, traceback):
-        # Close the database connection
-        if self.connection and self.connection.is_connected():
+        """
+        Close database connection when exiting the context
+        
+        Args:
+            exc_type: Exception type (if any)
+            exc_value: Exception value (if any)
+            traceback: Traceback object (if any)
+        """
+        # Close cursor and connection
+        if self.cursor:
+            self.cursor.close()
+        if self.connection:
             self.connection.close()
 
-# Example usage
-if __name__ == "__main__":
-    with DatabaseConnection('localhost', 'root', '123456', 'alx-backend-python') as cursor:
+def main():
+    """
+    Demonstrate usage of DatabaseConnection context manager
+    """
+    # Use context manager to execute a query
+    with DatabaseConnection() as cursor:
+        # Execute query to select all users
         cursor.execute("SELECT * FROM users")
-        results = cursor.fetchall()  # Fetch all results from the executed query
-        for row in results:
-            print(row)
+        
+        # Fetch and print results
+        users = cursor.fetchall()
+        for user in users:
+            print(user)
+
+if __name__ == "__main__":
+    main()
