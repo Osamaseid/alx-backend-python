@@ -1,34 +1,32 @@
 from rest_framework import serializers
-from .models import Conversation, Message, User
+from .models import Conversation, CustomUser, Message
 
-class UserSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
+class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
+        model = CustomUser
         fields = '__all__'
 
-    def get_full_name(self, obj):
-        """Returns the full name of the user."""
-        return f"{obj.first_name} {obj.last_name}"
-
-
 class MessageSerializer(serializers.ModelSerializer):
-    sender_name = serializers.CharField(source='sender.first_name', read_only=True)
+    sender = CustomUserSerializer(read_only=True)
+
     class Meta:
         model = Message
         fields = '__all__'
 
-    def validate_message_body(self, value):
-        """Custom validation for the message body."""
-        if len(value) < 1:
-            raise serializers.ValidationError("Message body cannot be empty.")
-        return value
-
-
 class ConversationSerializer(serializers.ModelSerializer):
+    participants = CustomUserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
+    participant_count = serializers.SerializerMethodField()
+    default_message = serializers.CharField(default="Initiate for endless conversation", read_only=True)
 
     class Meta:
         model = Conversation
         fields = '__all__'
 
+    def get_participant_count(self, obj):
+        return obj.participants.count()
+
+    def validate(self, obj):
+        if not obj.participants.exists():
+            raise serializers.ValidationError("A conversation must have at least one participant.")
+        return obj

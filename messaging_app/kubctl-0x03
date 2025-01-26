@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Set variables
+DEPLOYMENT_FILE="blue_deployment.yaml"
+SERVICE_URL="http://messaging-app.local/api-auth/messages/" # Replace with your service's IP/hostname and port
+
+# Apply the updated deployment
+echo "Applying the updated deployment..."
+kubectl apply -f $DEPLOYMENT_FILE
+
+# Trigger rolling update
+echo "Triggering a rolling update..."
+kubectl rollout restart deployment/django-messaging-blue
+
+# Monitor rollout status
+echo "Monitoring rollout status..."
+kubectl rollout status deployment/django-messaging-blue
+
+# Test for downtime using curl
+echo "Testing for app downtime..."
+for i in {1..20}; do
+  response=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL)
+  if [ "$response" == "200" ]; then
+    echo "[$i] App is UP - HTTP $response"
+  else
+    echo "[$i] App is DOWN or unavailable - HTTP $response"
+  fi
+  sleep 1
+done
+
+# Verify the rolling update is complete by checking pods
+echo "Verifying the current pods..."
+kubectl get pods -l app=django-messaging
+
+echo "Script execution complete."

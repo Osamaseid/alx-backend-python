@@ -3,29 +3,25 @@ import functools
 from datetime import datetime
 
 def log_queries(func):
-    """
-    Decorator to log SQL queries before executing them
-    """
+    """Decorator to log SQL queries with a timestamp."""
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        # Check if the first argument is a query
-        if args and isinstance(args[0], str):
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{timestamp}] Executing query: {args[0]}")
-        
-        # Execute the original function
-        return func(*args, **kwargs)
-    
+    def wrapper(query, *args, **kwargs):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] Executing query: {query}")  # Log the query with timestamp
+        return func(query, *args, **kwargs)  # Call the original function
     return wrapper
 
 @log_queries
 def fetch_all_users(query):
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    cursor.execute(query)
-    results = cursor.fetchall()
-    conn.close()
+    """Fetch all users from the database based on the provided SQL query."""
+    conn = sqlite3.connect('users.db')  # Connect to the SQLite database
+    cursor = conn.cursor()  # Create a cursor
+    cursor.execute(query)  # Execute the query
+    results = cursor.fetchall()  # Fetch all results
+    conn.close()  # Close the connection
     return results
 
-# Example usage
-users = fetch_all_users(query="SELECT * FROM users")
+# Example usage: fetch users while logging the query
+if __name__ == "__main__":
+    users = fetch_all_users(query="SELECT * FROM users")
+    print(users)

@@ -1,0 +1,6 @@
+# Installing ingress controller on minikube
+
+minikube addons enable ingress
+
+# Apply ingress configuration
+kubectl apply -f ingress.yaml

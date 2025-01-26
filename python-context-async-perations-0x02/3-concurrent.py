@@ -1,92 +1,43 @@
-import asyncio
 import aiosqlite
+import asyncio
 
-async def create_sample_database():
-    """
-    Create a sample SQLite database with user data.
-    """
-    async with aiosqlite.connect('users.db') as db:
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                name TEXT,
-                age INTEGER
-            )
-        ''')
-        
-        # Sample user data
-        users = [
-            ('Alice', 35),
-            ('Bob', 42),
-            ('Charlie', 28),
-            ('David', 45),
-            ('Eve', 39),
-            ('Frank', 50)
-        ]
-        
-        await db.executemany(
-            'INSERT OR IGNORE INTO users (name, age) VALUES (?, ?)', 
-            users
-        )
-        await db.commit()
+DATABASE = 'example.db'  # Replace with your database file
 
 async def async_fetch_users():
-    """
-    Fetch all users from the database asynchronously.
-    
-    :return: List of all users
-    """
-    async with aiosqlite.connect('users.db') as db:
-        async with db.execute('SELECT * FROM users') as cursor:
+    async with aiosqlite.connect(DATABASE) as db:
+        async with db.execute("SELECT * FROM users") as cursor:
             users = await cursor.fetchall()
-            print("All Users:")
-            for user in users:
-                print(user)
             return users
 
 async def async_fetch_older_users():
-    """
-    Fetch users older than 40 from the database asynchronously.
-    
-    :return: List of users older than 40
-    """
-    async with aiosqlite.connect('users.db') as db:
-        async with db.execute('SELECT * FROM users WHERE age > 40') as cursor:
+    async with aiosqlite.connect(DATABASE) as db:
+        async with db.execute("SELECT * FROM users WHERE age > 40") as cursor:
             older_users = await cursor.fetchall()
-            print("\nUsers Older than 40:")
-            for user in older_users:
-                print(user)
             return older_users
 
 async def fetch_concurrently():
-    """
-    Execute both user fetch queries concurrently using asyncio.gather.
-    
-    :return: Tuple of query results
-    """
-    # Ensure database is created before queries
-    await create_sample_database()
-    
-    # Use asyncio.gather to run queries concurrently
-    results = await asyncio.gather(
+    users, older_users = await asyncio.gather(
         async_fetch_users(),
         async_fetch_older_users()
     )
     
-    return results
-
-def main():
-    """
-    Run the concurrent database queries.
-    """
-    # Run the concurrent fetch using asyncio.run
-    results = asyncio.run(fetch_concurrently())
+    print("All Users:")
+    for user in users:
+        print(user)
     
-    # Optionally process or display results
-    all_users, older_users = results
-    print("\nQuery Results Summary:")
-    print(f"Total Users: {len(all_users)}")
-    print(f"Users Older than 40: {len(older_users)}")
+    print("\nUsers Older Than 40:")
+    for older_user in older_users:
+        print(older_user)
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    # Create a sample database and users table for demonstration
+    async def setup_database():
+        async with aiosqlite.connect(DATABASE) as db:
+            await db.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)')
+            await db.execute('INSERT INTO users (name, age) VALUES ("Alice", 30), ("Bob", 45), ("Carol", 50), ("David", 22)')
+            await db.commit()
+
+    asyncio.run(setup_database())  # Set up the database
+
+    # Run the concurrent fetch
+    asyncio.run(fetch_concurrently())

@@ -1,39 +1,61 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 import uuid
 
-class User(AbstractUser):
-  class Meta:
-    app_label = 'chats'
-  user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-  first_name = models.CharField(max_length=100, null=False)
-  last_name = models.CharField(max_length=100, null=False)
-  email = models.EmailField(unique=True, null=False, db_index=True)
-  password_hash = models.CharField(max_length=100, null=False)
-  phone_number = models.CharField(max_length=100, null=True)
-  role = models.CharField(max_length=100, choices=[('guest', 'Guest'), ('host', 'Host'), ('admin', 'Admin')], null=False)
-  created_at = models.DateTimeField(auto_now=True)
-  user_permissions = models.ManyToManyField(
-    Permission,
-    blank=True,
-    related_name='chat_user_permissions'  # Change related_name to avoid clashes
-  )
-    
-  groups = models.ManyToManyField(
-    Group,
-    blank=True,
-    related_name='chat_user_groups'  # Change related_name to avoid clashes
-  )
+class CustomUser(AbstractUser):
+    """
+    CustomUser model extending AbstractUser with additional fields per specification
+    password to be dealt with objects directly
+    """
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
+    email = models.EmailField(unique=True, null=False)
+    phone_number = models.CharField(max_length=13, null=True, blank=True)
+    first_name = models.CharField(max_length=150, null= False, blank= False)
+    last_name = models.CharField(max_length=150, null= False, blank= False)
+    ROLE_CHOICES = (
+        ('guest', 'Guest'),
+        ('host', 'Host'),
+        ('admin', 'Admin')
+    )
+    role = models.CharField(
+        max_length=5,
+        choices=ROLE_CHOICES,
+        null=False,
+        default='guest'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['email']),
+        ]
 
 class Conversation(models.Model):
-  conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=True)
-  participants = models.ManyToManyField(User, related_name='conversations')
-  created_at = models.DateTimeField(auto_now=True)
-
+    """
+    Conversation model for managing chat conversations between users
+    """
+    conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='conversations'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class Message(models.Model):
-    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
-    message_body = models.TextField(null=False)
+    """
+    Message model for storing individual messages within conversations
+    """
+    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='sent_messages'
+    )
+    message_body = models.TextField(null=False, blank=False)
     sent_at = models.DateTimeField(auto_now_add=True)

@@ -1,9 +1,15 @@
-from rest_framework.permissions import BasePermission
+from rest_framework import permissions
 
-class IsParticipant(BasePermission):
+class IsConversationParticipant(permissions.BasePermission):
+    """
+    Custom permission to allow only conversation participants to access it.
+    """
     def has_object_permission(self, request, view, obj):
         return request.user in obj.participants.all()
 
-class IsSender(BasePermission):
+class IsMessageParticipant(permissions.BasePermission):
+    """
+    Custom permission to allow only conversation participants to access messages.
+    """
     def has_object_permission(self, request, view, obj):
-        return request.user == obj.sender
+        return request.user in obj.conversation.participants.all()

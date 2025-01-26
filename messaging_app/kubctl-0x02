@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Step 1: Deploy the blue version
+echo "Deploying blue version..."
+kubectl apply -f blue_deployment.yaml
+
+# Step 2: Deploy the green version
+echo "Deploying green version..."
+kubectl apply -f green_deployment.yaml
+
+# Step 3: Verify both deployments
+echo "Verifying deployments..."
+kubectl get deployments -l app=django-messaging
+
+# Step 4: Apply service pointing to the blue version
+echo "Pointing service to the blue version..."
+kubectl apply -f kubeservice.yaml
+
+# Step 5: Switch traffic to the green version
+echo "Switching traffic to the green version..."
+kubectl patch service django-messaging-service -p '{"spec":{"selector":{"app":"django-messaging","version":"green"}}}'
+
+# Step 6: Verify the traffic switch
+echo "Verifying traffic routing to the green version..."
+kubectl describe service django-messaging-service
+
+# Step 7: Check logs for both deployments
+echo "Checking logs for the blue deployment..."
+kubectl logs -l version=blue --tail=10
+
+echo "Checking logs for the green deployment..."
+kubectl logs -l version=green --tail=10

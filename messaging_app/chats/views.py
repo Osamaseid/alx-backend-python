@@ -1,119 +1,96 @@
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from .permissions import IsOwnerOfConversation, IsSenderOfMessage
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from .models import Conversation, Message, User
-from .serializers import ConversationSerializer, MessageSerializer, SignupSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView
-from .auth import CustomTokenObtainPairSerializer
+from .models import User, Message, Conversation
+from .serializers import UserSerializer, MessageSerializer, ConversationSerializer
 
 
-class ConversationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for listing, creating, and retrieving conversations.
-    """
-    permission_classes = [IsAuthenticated, IsOwnerOfConversation]
-    queryset = Conversation.objects.all()
-    serializer_class = ConversationSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['participants__first_name', 'participants__last_name']
-
-    def get_queryset(self):
-        # Return only conversations the user participates in
-        return Conversation.objects.filter(participants=self.request.user)
-
-    def create(self, request, *args, **kwargs):
-        """
-        Override the create method to handle creating a new conversation.
-        """
-        participants_ids = request.data.get('participants')
-        if not participants_ids:
-            return Response(
-                {"error": "Participants are required to create a conversation."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        participants = User.objects.filter(user_id__in=participants_ids)
-        if not participants.exists():
-            return Response(
-                {"error": "Invalid participant IDs provided."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        conversation = Conversation.objects.create()
-        conversation.participants.set(participants)
-        conversation.save()
-
-        return Response(
-            ConversationSerializer(conversation).data,
-            status=status.HTTP_201_CREATED,
-        )
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('-created_at')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for listing and creating messages.
-    """
-    permission_classes = [IsAuthenticated, IsSenderOfMessage]
-    queryset = Message.objects.all()
+    queryset = Message.objects.all().order_by('conversation', '-sent_at')
     serializer_class = MessageSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['message_body', 'sender__first_name', 'sender__last_name']
 
-    def get_queryset(self):
-        # Return only messages in conversations the user participates in
-        return Message.objects.filter(conversation__participants=self.request.user)
+    @action(methods=['get'], detail=False)
+    def get_all(self, request):
+        messages = Message.objects.all().order_by('-sent_at')
+        serializer = MessageSerializer(messages, many=True)
 
-    def create(self, request, *args, **kwargs):
-        """
-        Override the create method to handle sending a new message.
-        """
-        conversation_id = self.kwargs.get('conversation_pk')
+        return Response(serializer.data)
+    
+    @action(methods=['get'], detail=True)
+    def get_conversation(self, request, pk=None):
+        conversation = Conversation.objects.filter(pk=pk).first()
+        if not conversation:
+            return Response({'Error': 'Conversation not exists.'}, status=404)
+        
+        messages = Message.objects.filter(conversation=conversation).order_by('-sent_at')
+        serializer = MessageSerializer(messages, many=True)
+
+        return Response(serializer.data)
+
+    @action(methods=['POST'], detail=False)
+    def _create(self, request):
         sender_id = request.data.get('sender')
+        conversation_id = request.data.get('conversation')
         message_body = request.data.get('message_body')
 
-        if not sender_id or not message_body:
-            return Response(
-                {"error": "sender, and message_body are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not all([sender_id, conversation_id, message_body]):
+            return Response({'Error': 'All fields are required.'}, status=400)
+        
+        sender = User.objects.filter(pk=sender_id).first()
+        conversation = Conversation.objects.filter(pk=conversation_id).first()
+        if not all([sender, conversation]):
+            return Response({'Error': 'Sender or conversation not exists.'}, status=404)
+        
+        message = Message.objects.create(sender=sender, conversation=conversation, message_body=message_body)
+        dto = self.get_serializer(message).data
 
-        try:
-            conversation = Conversation.objects.get(
-                conversation_id=conversation_id)
-            sender = User.objects.get(user_id=sender_id)
-        except (Conversation.DoesNotExist, User.DoesNotExist) as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        message = Message.objects.create(
-            conversation=conversation,
-            sender=sender,
-            message_body=message_body,
-        )
-
-        return Response(
-            MessageSerializer(message).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(dto, status=201)
 
 
-class SignupView(APIView):
-    """
-    Endpoint for user registration.
-    """
-    permission_classes = [AllowAny]
+class ConversationViewSet(viewsets.ModelViewSet):
+    queryset = Conversation.objects.all().order_by('-created_at')
+    serializer_class = ConversationSerializer
 
-    def post(self, request, *args, **kwargs):
-        serializer = SignupSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "User registered successfully."}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_serializer_context(self):
+        """
+        Include the request in the context for serializers.
+        """
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
+    @action(methods=['get'], detail=False)
+    def get_all(self, request):
+        conversations = Conversation.objects.all().order_by('-created_at')
+        serializer = ConversationSerializer(conversations, many=True)
 
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
+        return Response(serializer.data)
+
+    @action(methods=['POST'], detail=False)
+    def _create(self, request):
+        participants_ids = request.data.get('participants', [])
+
+        filters = {
+            'participants': participants_ids,
+        }
+
+        if not filters['participants']:
+            return Response({'Error': 'This field is required.'}, status=400)
+        if not participants_ids or len(participants_ids) < 2:
+            return Response({'Error': 'At least 2 participants are required.'}, status=400)
+        
+        participants = User.objects.filter(pk__in=participants_ids)
+        if len(participants) != len(participants_ids):
+            return Response({'Error': 'Some or all users not exists'}, status=404)
+        
+        conversation = Conversation.objects.create(title=request.data.get('title'))
+        conversation.participants.set(participants)
+        dto = self.get_serializer(conversation).data
+
+        return Response(dto, status=201)

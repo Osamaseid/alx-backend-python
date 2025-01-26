@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_CREDENTIALS = credentials('github-credentials') // Replace with your credentials ID
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    // Checkout the code from the specified branch
+                    def branch = 'main' // Specify your branch here
+                    echo "Checking out branch: ${branch}"
+                    git branch: branch, url: 'https://github.com/yourusername/alx-backend-python.git', credentialsId: 'github-credentials'
+                }
+            }
+        }
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    // Install dependencies with pip3
+                    sh 'pip3 install -r messaging_app/requirements.txt'
+                }
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                script {
+                    // Run tests using pytest and generate a report
+                    sh 'pytest messaging_app/tests > test_report.txt; tail -n 10 test_report.txt'
+                }
+            }
+        }
+        stage('Generate Report') {
+            steps {
+                script {
+                    // Archive the test report
+                    archiveArtifacts artifacts: 'test_report.txt', fingerprint: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up...'
+        }
+    }
+}

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main  # Specify your default branch
+  pull_request:
+    branches:
+      - main  # Specify your default branch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword  # Change this to a secure password
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: testpassword  # Change this to a secure password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=30s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'  # Specify your Python version
+
+      - name: Install dependencies
+        run: |
+          pip install -r messaging_app/requirements.txt
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: mysql://test_user:testpassword@127.0.0.1:3306/test_db
+        run: |
+          python messaging_app/manage.py migrate
+
+      - name: Run tests
+        env:
+          DATABASE_URL: mysql://test_user:testpassword@127.0.0.1:3306/test_db
+        run: |
+          pytest messaging_app/tests
